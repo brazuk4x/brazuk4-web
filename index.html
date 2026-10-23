@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brazuk4 Web Loader | Sube y Hospeda tus Webs</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            cyan: '#06b6d4',
+                            purple: '#8b5cf6',
+                            dark: '#0B0F19',
+                            card: '#111827',
+                            border: '#1f2937'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <!-- JSZip CDN for ZIP file extraction and packaging -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="bg-[#080C14] text-gray-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-black">
+
+    <!-- Banned Alert Banner (Hidden by default, shown if current user is banned) -->
+    <div id="bannedAlertBanner" class="hidden bg-red-600 text-white px-4 py-2 text-center text-xs font-bold flex items-center justify-center gap-2 shadow-lg z-50">
+        <i class="fa-solid fa-ban text-sm"></i>
+        <span>TU CUENTA HA SIDO BANEADA: No puedes subir ni actualizar proyectos. Contacta al programador.</span>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-40 backdrop-blur-md bg-[#080C14]/85 border-b border-gray-800/80 px-4 lg:px-8 py-3.5 transition-all">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Brand Logo -->
+            <a href="index.html" class="flex items-center gap-3 group">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-green-500 via-emerald-400 to-cyan-400 p-[2px] shadow-lg shadow-green-500/20 group-hover:shadow-green-500/40 transition">
+                    <div class="w-full h-full bg-[#0B0F19] rounded-[10px] flex items-center justify-center">
+                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-lg group-hover:scale-110 transition"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
+                            Brazuk4
+                        </span>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            Web Loader
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 hidden sm:block">Publica tus webs al instante con URL personalizada</p>
+                </div>
+            </a>
+
+            <!-- Right Actions: Google Auth, New Web button & Links -->
+            <div class="flex items-center gap-3">
+                <!-- User Profile / Google Sign-In Button -->
+                <div id="authContainer" class="flex items-center">
+                    <!-- Shown when NOT logged in -->
+                    <button id="btnOpenGoogleLogin" type="button" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-gray-100 text-gray-800 font-semibold text-xs border border-gray-300 shadow-md transition hover:scale-[1.02] active:scale-[0.98]">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Acceder con Google</span>
+                    </button>
+
+                    <!-- Shown when LOGGED IN -->
+                    <div id="userProfileBadge" class="hidden flex items-center gap-2 bg-[#111827] border border-gray-800 rounded-xl px-2.5 py-1.5">
+                        <img id="userAvatarImg" src="" alt="Avatar" class="w-7 h-7 rounded-full border border-emerald-500/40 bg-gray-800" />
+                        <div class="hidden sm:block text-left">
+                            <span id="userNameText" class="text-xs font-bold text-white block max-w-[120px] truncate">Usuario</span>
+                            <span id="userEmailText" class="text-[10px] text-gray-400 block max-w-[120px] truncate">correo@gmail.com</span>
+                        </div>
+                        <button id="btnLogout" class="ml-1 p-1.5 text-gray-400 hover:text-red-400 transition" title="Cerrar sesión">
+                            <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Top Make a new web button -->
+                <button id="btnNewWebTop" class="relative group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium text-xs sm:text-sm shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition">
+                    <i class="fa-solid fa-plus text-xs group-hover:rotate-90 transition-transform duration-300"></i>
+                    <span>Make a new web</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex flex-col gap-12">
+
+        <!-- HERO / WIZARD CONTAINER -->
+        <section class="relative">
+            <!-- Background Glow FX -->
+            <div class="absolute -top-16 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-b from-emerald-500/15 via-teal-500/10 to-transparent blur-3xl pointer-events-none rounded-full"></div>
+
+            <!-- Header Info -->
+            <div class="text-center mb-8 relative z-10">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-medium mb-3">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Despliegue rápido para GitHub & Vercel
+                </div>
+                <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3">
+                    Sube tu página y compártela <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">con el mundo</span>
+                </h1>
+                <p class="text-gray-400 text-sm sm:text-base max-w-xl mx-auto">
+                    Introduce el nombre, suelta tus archivos HTML, CSS o JS, y obtén una URL pública personalizada con tu ruta aleatoria.
+                </p>
+            </div>
+
+            <!-- STEP 1: NOMBRE DE TU PÁGINA WEB -->
+            <div id="step1Container" class="wizard-step active-step bg-[#111827]/90 border border-gray-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden transition-all duration-500 max-w-2xl mx-auto">
+                <div class="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px]">1</span>
+                    Paso 1 de 2
+                </div>
+                <h2 class="text-xl sm:text-2xl font-bold text-white mb-2">Nombre de tu página web</h2>
+                <p class="text-gray-400 text-sm mb-6">
+                    Elige cómo se llamará tu proyecto. Se usará para generar tu enlace personalizado.
+                </p>
+
+                <!-- Input with Arrow button -->
+                <form id="formStep1" class="relative flex items-center gap-3">
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                            <i class="fa-solid fa-globe"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="siteNameInput" 
+                            placeholder="Ej. mi-portafolio-pro, tienda-online, juego-retro..." 
+                            required
+                            autocomplete="off"
+                            class="w-full pl-11 pr-4 py-4 rounded-2xl bg-[#090D16] border border-gray-700/80 text-white placeholder-gray-500 text-base sm:text-lg focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 transition shadow-inner font-medium"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        id="btnNextStep1"
+                        class="h-14 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-[1.03] active:scale-[0.97] transition flex-shrink-0 cursor-pointer"
+                        title="Presiona Enter o haz clic para continuar"
+                    >
+                        <span class="hidden sm:inline">Continuar</span>
+                        <i class="fa-solid fa-arrow-right text-base sm:text-lg"></i>
+                    </button>
+                </form>
+
+                <div class="mt-4 flex flex-wrap items-center justify-between text-xs text-gray-500 gap-2">
+                    <span>💡 Puedes presionar <kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 font-mono text-[10px] border border-gray-700">Enter ↵</kbd> para avanzar</span>
+                    <button id="btnLoadDemo" type="button" class="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Probar con plantilla de ejemplo</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2: DROP HERE YOUR PROJECT -->
+            <div id="step2Container" class="wizard-step hidden bg-[#111827]/90 border border-gray-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden transition-all duration-500 max-w-2xl mx-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px]">2</span>
+                        Paso 2 de 2 • <span id="currentProjectBadge" class="text-white font-mono lowercase">mi-web</span>
+                    </div>
+                    <button id="btnBackToStep1" type="button" class="text-xs text-gray-400 hover:text-gray-200 flex items-center gap-1 transition">
+                        <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                        <span>Cambiar nombre</span>
+                    </button>
+                </div>
+
+                <!-- Drop Area -->
+                <div 
+                    id="dropZone" 
+                    class="border-2 border-dashed border-gray-700 hover:border-emerald-500/80 rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-300 bg-[#090D16]/60 hover:bg-[#090D16] group relative overflow-hidden"
+                >
+                    <div class="drop-glow absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+
+                    <div class="relative z-10 flex flex-col items-center">
+                        <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl group-hover:-translate-y-0.5 transition-transform"></i>
+                        </div>
+                        <h3 class="text-lg sm:text-xl font-bold text-white mb-1">
+                            Drop here your project
+                        </h3>
+                        <p class="text-gray-400 text-xs sm:text-sm max-w-sm mb-4">
+                            Arrastra tu carpeta de proyecto, un archivo <strong class="text-emerald-400 font-medium">.ZIP</strong> o tus archivos <strong class="text-emerald-400 font-medium">index.html</strong>, css y js
+                        </p>
+                        
+                        <!-- Buttons for selecting Folder or Files -->
+                        <div class="flex flex-wrap items-center justify-center gap-2">
+                            <button type="button" id="btnSelectFiles" class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-semibold border border-gray-700 transition flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-regular fa-file-lines text-emerald-400"></i>
+                                <span>Seleccionar Archivos</span>
+                            </button>
+                            <button type="button" id="btnSelectFolder" class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-semibold border border-gray-700 transition flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-regular fa-folder-open text-teal-400"></i>
+                                <span>Seleccionar Carpeta</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hidden Inputs -->
+                    <input type="file" id="fileInputFiles" multiple class="hidden" accept=".html,.htm,.css,.js,.json,.png,.jpg,.jpeg,.svg,.gif,.webp,.ico,.txt,.zip" />
+                    <input type="file" id="fileInputFolder" webkitdirectory directory multiple class="hidden" />
+                </div>
+
+                <!-- Files Preview List -->
+                <div id="fileListContainer" class="hidden mt-6 bg-[#090D16] border border-gray-800 rounded-2xl p-4">
+                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-800 text-xs">
+                        <span class="text-gray-400 font-medium">
+                            <i class="fa-solid fa-list-check text-emerald-400 mr-1.5"></i>
+                            Archivos listos (<span id="fileCountBadge" class="text-white font-bold">0</span>)
+                        </span>
+                        <span id="fileTotalSize" class="text-gray-500 font-mono">0 KB</span>
+                    </div>
+                    <div id="fileItemsList" class="max-h-40 overflow-y-auto space-y-1.5 pr-1 text-xs font-mono text-gray-300"></div>
+
+                    <!-- Upload Action -->
+                    <div class="mt-4 pt-3 border-t border-gray-800/80 flex items-center justify-between gap-3">
+                        <button type="button" id="btnClearFiles" class="text-xs text-gray-500 hover:text-red-400 transition">
+                            <i class="fa-solid fa-trash-can mr-1"></i> Descartar
+                        </button>
+                        <button 
+                            type="button" 
+                            id="btnConfirmUpload" 
+                            class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-sm shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition flex items-center gap-2 cursor-pointer"
+                        >
+                            <span>Publicar mi Web</span>
+                            <i class="fa-solid fa-rocket"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 3: LOADING & PROGRESS BAR -->
+            <div id="step3Loading" class="wizard-step hidden bg-[#111827]/90 border border-gray-800 rounded-3xl p-8 sm:p-12 shadow-2xl backdrop-blur-xl relative overflow-hidden transition-all duration-500 max-w-2xl mx-auto text-center">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-6 relative">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl"></i>
+                    <div class="absolute -inset-1 rounded-2xl bg-emerald-500/20 blur-sm -z-10 animate-pulse"></div>
+                </div>
+
+                <h3 class="text-xl sm:text-2xl font-bold text-white mb-2">
+                    Cargando y desplegando tu página...
+                </h3>
+                <p id="loadingStatusText" class="text-gray-400 text-sm mb-6">
+                    Leyendo estructura de archivos...
+                </p>
+
+                <!-- Modern Progress Bar -->
+                <div class="relative w-full bg-[#090D16] rounded-full h-4 p-0.5 border border-gray-800 overflow-hidden mb-3">
+                    <div 
+                        id="uploadProgressBar" 
+                        class="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 transition-all duration-300 relative shadow-lg shadow-emerald-500/40"
+                        style="width: 5%;"
+                    >
+                        <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs font-mono text-gray-500">
+                    <span id="loadingStepDetail">Preparando paquetes</span>
+                    <span id="loadingPercent">5%</span>
+                </div>
+            </div>
+
+            <!-- STEP 4: SUCCESS & LIVE LINK SHOWCASE -->
+            <div id="step4Success" class="wizard-step hidden bg-[#111827]/90 border border-emerald-500/40 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-emerald-500/10 backdrop-blur-xl relative overflow-hidden transition-all duration-500 max-w-2xl mx-auto">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                        <i class="fa-solid fa-check text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white">¡Página web subida y pública!</h3>
+                        <p class="text-xs text-gray-400">Tu proyecto ya está generado y listo para verse en línea</p>
+                    </div>
+                </div>
+
+                <!-- Generated URL Card -->
+                <div class="bg-[#090D16] border border-gray-800 rounded-2xl p-4 mb-5">
+                    <span class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold block mb-1">
+                        Tu Enlace Público Personalizado:
+                    </span>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <input 
+                            type="text" 
+                            id="successUrlInput" 
+                            readonly 
+                            class="flex-1 bg-black/50 border border-gray-700/60 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-emerald-300 select-all focus:outline-none"
+                        />
+                        <button 
+                            id="btnCopySuccessUrl" 
+                            class="px-4 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        >
+                            <i class="fa-regular fa-copy"></i>
+                            <span id="copySuccessText">Copiar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <a 
+                        id="btnOpenSuccessSite" 
+                        href="#" 
+                        target="_blank" 
+                        class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-sm text-center flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition cursor-pointer"
+                    >
+                        <span>Abrir mi Web en Vivo</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    </a>
+                    <button 
+                        id="btnNewWebFromSuccess" 
+                        type="button" 
+                        class="py-3 px-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium border border-gray-700 transition flex items-center gap-1.5"
+                    >
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Subir otra web</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- DASHBOARD: PROYECTOS SUBIDOS -->
+        <section id="proyectosSection" class="pt-4 border-t border-gray-800/80">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-emerald-400 text-lg"></i>
+                        Tus Proyectos Subidos
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-400">
+                        Administra, actualiza y comparte todas las páginas webs que has publicado
+                    </p>
+                </div>
+
+                <!-- Search / Filter -->
+                <div class="relative w-full sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500 text-xs">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="projectSearchInput" 
+                        placeholder="Buscar por nombre..." 
+                        class="w-full pl-9 pr-3 py-2 rounded-xl bg-[#111827] border border-gray-800 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
+                    />
+                </div>
+            </div>
+
+            <!-- Projects Grid -->
+            <div id="projectsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+            <!-- Empty State when no projects -->
+            <div id="emptyProjectsState" class="hidden text-center py-16 px-4 bg-[#111827]/40 border border-gray-800/60 rounded-3xl">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-800/60 border border-gray-700/60 flex items-center justify-center text-gray-400 mb-3">
+                    <i class="fa-solid fa-folder-open text-xl"></i>
+                </div>
+                <h3 class="text-base font-semibold text-white mb-1">Aún no has subido proyectos</h3>
+                <p class="text-xs text-gray-400 max-w-sm mx-auto mb-4">
+                    Usa el formulario superior para nombrar tu web y arrastrar tus archivos HTML. ¡Aparecerá aquí de inmediato!
+                </p>
+                <button id="btnEmptyStateNewWeb" class="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition">
+                    + Make a new web
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- AUTH MODAL (Google Seamless Login - No API Key Needed) -->
+    <div id="googleAuthModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
+        <div class="bg-[#181d28] border border-gray-700 rounded-3xl max-w-sm w-full p-6 sm:p-8 shadow-2xl relative">
+            <button id="btnCloseAuthModal" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <!-- Google Header -->
+            <div class="text-center mb-6">
+                <svg class="w-10 h-10 mx-auto mb-3" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <h3 class="text-lg font-bold text-white">Acceder con Google</h3>
+                <p class="text-xs text-gray-400">Continuar en Brazuk4 Web Loader</p>
+            </div>
+
+            <!-- Existing Accounts Quick Select -->
+            <div id="quickAccountsContainer" class="mb-5 space-y-2">
+                <span class="text-[11px] text-gray-400 font-semibold block uppercase tracking-wider mb-1">
+                    Cuentas detectadas:
+                </span>
+                <button type="button" class="btn-quick-login w-full p-2.5 rounded-2xl bg-[#0F1420] hover:bg-[#1a2336] border border-gray-700/80 flex items-center gap-3 transition text-left" data-name="Juanito Pérez" data-email="juanito.perez@gmail.com">
+                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Juanito" class="w-8 h-8 rounded-full border border-gray-600" />
+                    <div class="truncate">
+                        <span class="font-bold text-xs text-white block">Juanito Pérez</span>
+                        <span class="text-[11px] text-gray-400 block truncate">juanito.perez@gmail.com</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Custom Registration Form -->
+            <form id="googleLoginForm" class="space-y-3">
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-gray-700"></div>
+                    <span class="flex-shrink mx-2 text-[10px] text-gray-500 uppercase">O usa otra cuenta</span>
+                    <div class="flex-grow border-t border-gray-700"></div>
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-semibold text-gray-300 block mb-1">Tu Nombre:</label>
+                    <input 
+                        type="text" 
+                        id="googleInputName" 
+                        placeholder="Ej. Juanito Coder" 
+                        required
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-gray-700 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-semibold text-gray-300 block mb-1">Tu Correo de Google:</label>
+                    <input 
+                        type="email" 
+                        id="googleInputEmail" 
+                        placeholder="juanito@gmail.com" 
+                        required
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-gray-700 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    />
+                </div>
+
+                <button 
+                    type="submit" 
+                    class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/20"
+                >
+                    Continuar como Usuario
+                </button>
+            </form>
+
+            <p class="text-[10px] text-gray-500 text-center mt-4">
+                <i class="fa-solid fa-lock text-emerald-400 mr-1"></i> Seguro: No requerimos ni guardamos contraseñas.
+            </p>
+        </div>
+    </div>
+
+    <!-- UPDATE MODAL (Actualizar archivos de un proyecto existente) -->
+    <div id="updateModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-opacity">
+        <div class="bg-[#111827] border border-gray-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative">
+            <button id="btnCloseUpdateModal" class="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-lg transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400">
+                    <i class="fa-solid fa-rotate text-base"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">Actualizar Proyecto</h3>
+                    <p id="updateModalProjectName" class="text-xs font-mono text-emerald-400">nombre-proyecto</p>
+                </div>
+            </div>
+
+            <p class="text-xs text-gray-400 mb-4">
+                Envía los nuevos archivos para sustituir la versión anterior. Tu enlace y URL pública se conservarán intactos.
+            </p>
+
+            <!-- Drop Zone in Modal -->
+            <div 
+                id="modalUpdateDropZone" 
+                class="border-2 border-dashed border-gray-700 hover:border-teal-400 rounded-2xl p-6 text-center cursor-pointer bg-[#090D16] transition group mb-4"
+            >
+                <i class="fa-solid fa-arrow-up-from-bracket text-2xl text-teal-400 mb-2 group-hover:scale-110 transition"></i>
+                <p class="text-sm font-semibold text-white">Suelta aquí los nuevos archivos o carpeta</p>
+                <p class="text-[11px] text-gray-500 mt-1">HTML, CSS, JS o archivo .ZIP</p>
+                
+                <input type="file" id="modalUpdateFileInput" multiple class="hidden" />
+            </div>
+
+            <div id="modalUpdateFilesList" class="hidden mb-4 p-3 bg-[#090D16] border border-gray-800 rounded-xl text-xs font-mono max-h-32 overflow-y-auto text-gray-300"></div>
+
+            <!-- Modal Progress Bar -->
+            <div id="modalUpdateProgress" class="hidden mb-4">
+                <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div id="modalUpdateProgressBar" class="h-full bg-teal-400 transition-all duration-300" style="width: 10%"></div>
+                </div>
+                <span class="text-[10px] text-gray-400 block text-right mt-1">Actualizando archivos...</span>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button id="btnCancelUpdateModal" type="button" class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 transition">
+                    Cancelar
+                </button>
+                <button id="btnConfirmUpdateModal" type="button" disabled class="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed text-black text-xs font-bold transition flex items-center gap-1.5">
+                    <span>Actualizar Web</span>
+                    <i class="fa-solid fa-check"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-gray-800/60 bg-[#060910] py-6 px-4 text-center text-xs text-gray-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-400">Brazuk4 Web Loader</span>
+                <span>• Listo para GitHub & Vercel</span>
+            </div>
+            <div class="flex items-center gap-4 text-gray-400">
+                <span>Almacenamiento Local Seguro & Rutas Públicas</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- App Scripts -->
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "routes": [
+    {
+      "src": "^/p/(.*)$",
+      "dest": "/view.html?p=$1"
+    },
+    {
+      "src": "^/view$",
+      "dest": "/view.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}

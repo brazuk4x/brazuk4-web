@@ -1,0 +1,115 @@
+/* Brazuk4 Web Loader Custom Styles */
+
+/* Custom Smooth Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #080C14;
+}
+::-webkit-scrollbar-thumb {
+    background: #1f2937;
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #374151;
+}
+
+/* Glassmorphism effects */
+.glass-panel {
+    background: rgba(17, 24, 39, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Drop Zone Dragover animations */
+#dropZone.drag-over {
+    border-color: #10b981 !important;
+    background-color: rgba(16, 185, 129, 0.08) !important;
+    transform: scale(1.01);
+}
+
+#dropZone.drag-over .drop-glow {
+    opacity: 1 !important;
+}
+
+#modalUpdateDropZone.drag-over {
+    border-color: #2dd4bf !important;
+    background-color: rgba(45, 212, 191, 0.08) !important;
+}
+
+/* Wizard Step transitions */
+.wizard-step {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wizard-step.hidden {
+    display: none;
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+}
+
+.wizard-step.active-step {
+    display: block;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    animation: fadeInStep 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInStep {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Glowing Pulsing Border */
+@keyframes borderPulse {
+    0%, 100% {
+        box-shadow: 0 0 15px -3px rgba(34, 197, 94, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 25px 2px rgba(34, 197, 94, 0.4);
+    }
+}
+
+.glow-active {
+    animation: borderPulse 3s infinite ease-in-out;
+}
+
+/* Toast Animation */
+.toast-enter {
+    animation: toastSlideIn 0.3s ease forwards;
+}
+
+.toast-exit {
+    animation: toastSlideOut 0.3s ease forwards;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes toastSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(10px) scale(0.9);
+    }
+}

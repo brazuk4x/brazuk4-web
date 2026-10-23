@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brazuk4 Web Viewer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <!-- JSZip for standalone zip decompression if needed -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #080C14;
+        }
+        #previewFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #ffffff;
+            transition: all 0.3s ease;
+        }
+        /* Device preview container */
+        .preview-container {
+            transition: all 0.3s ease;
+        }
+        .preview-desktop {
+            width: 100%;
+            height: 100%;
+        }
+        .preview-tablet {
+            width: 768px;
+            height: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 8px solid #1f2937;
+        }
+        .preview-mobile {
+            width: 390px;
+            height: 85%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border-radius: 28px;
+            overflow: hidden;
+            border: 10px solid #1f2937;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen text-gray-100 font-sans selection:bg-emerald-500">
+
+    <!-- Top floating navigation bar -->
+    <header id="viewerHeader" class="bg-[#0B0F19] border-b border-gray-800 px-4 py-2.5 flex items-center justify-between text-xs z-30 transition-transform duration-300">
+        <!-- Brand & Project Info -->
+        <div class="flex items-center gap-3">
+            <a href="index.html" class="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 font-bold transition">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span class="hidden sm:inline">Brazuk4 Loader</span>
+            </a>
+            <span class="text-gray-600">|</span>
+            <div class="flex items-center gap-1.5">
+                <span id="siteTitleBadge" class="font-bold text-white max-w-[150px] sm:max-w-xs truncate">Cargando...</span>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono">Pública</span>
+            </div>
+            <span id="sitePathBadge" class="hidden md:inline font-mono text-gray-500 text-[11px] max-w-sm truncate"></span>
+        </div>
+
+        <!-- Center: Device view switcher -->
+        <div class="hidden sm:flex items-center bg-[#111827] rounded-xl p-1 border border-gray-800 gap-1">
+            <button id="btnDeviceDesktop" class="px-2.5 py-1 rounded-lg bg-gray-800 text-white hover:text-white transition" title="Vista Escritorio">
+                <i class="fa-solid fa-desktop"></i>
+            </button>
+            <button id="btnDeviceTablet" class="px-2.5 py-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition" title="Vista Tablet">
+                <i class="fa-solid fa-tablet-screen-button"></i>
+            </button>
+            <button id="btnDeviceMobile" class="px-2.5 py-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition" title="Vista Móvil">
+                <i class="fa-solid fa-mobile-screen-button"></i>
+            </button>
+        </div>
+
+        <!-- Right actions -->
+        <div class="flex items-center gap-2">
+            <button id="btnCopyViewerLink" class="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium border border-gray-700 transition flex items-center gap-1.5">
+                <i class="fa-regular fa-copy text-emerald-400"></i>
+                <span class="hidden sm:inline">Copiar Link</span>
+            </button>
+            <button id="btnReloadFrame" class="p-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition" title="Recargar Web">
+                <i class="fa-solid fa-arrow-rotate-right"></i>
+            </button>
+            <button id="btnToggleHeader" class="p-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition" title="Modo Pantalla Completa">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Mini button to restore header when hidden in full-screen -->
+    <button id="btnRestoreHeader" class="fixed top-2 right-2 z-50 p-2 rounded-full bg-black/70 hover:bg-black text-white text-xs border border-gray-700 shadow-xl hidden transition-all" title="Mostrar controles">
+        <i class="fa-solid fa-compress"></i>
+    </button>
+
+    <!-- Content Workspace -->
+    <main class="flex-1 w-full h-full relative overflow-hidden flex items-center justify-center bg-[#060910]">
+        
+        <!-- Loading overlay -->
+        <div id="viewerLoading" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#080C14]">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4 animate-spin">
+                <i class="fa-solid fa-spinner text-xl"></i>
+            </div>
+            <p class="text-sm font-semibold text-white">Cargando sitio web...</p>
+            <p id="viewerLoadingSub" class="text-xs text-gray-500 mt-1">Buscando archivos y recursos virtuales</p>
+        </div>
+
+        <!-- Error state -->
+        <div id="viewerError" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#080C14] p-6 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-4 text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-2">No se encontró esta página web</h2>
+            <p class="text-gray-400 text-xs sm:text-sm max-w-md mb-6">
+                Este proyecto no está guardado en este navegador o el enlace no es válido. Puedes subirlo o gestionar tus proyectos en el panel principal.
+            </p>
+            <a href="index.html" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Volver a Brazuk4 Web Loader</span>
+            </a>
+        </div>
+
+        <!-- Frame Container -->
+        <div id="previewContainer" class="preview-container preview-desktop flex items-center justify-center">
+            <iframe 
+                id="previewFrame" 
+                sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals"
+                title="Brazuk4 Public Web Preview"
+            ></iframe>
+        </div>
+    </main>
+
+    <!-- Viewer Script -->
+    <script>
+        // IndexedDB Configuration
+        const DB_NAME = 'brazuk4_web_loader_db';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'projects';
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getProjectById(id) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const req = store.get(id);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function getAllProjects() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // Get Query Params
+        const urlParams = new URLSearchParams(window.location.search);
+        let siteId = urlParams.get('id');
+        let siteSlug = urlParams.get('p') || urlParams.get('slug');
+
+        const elements = {
+            viewerHeader: document.getElementById('viewerHeader'),
+            siteTitleBadge: document.getElementById('siteTitleBadge'),
+            sitePathBadge: document.getElementById('sitePathBadge'),
+            previewFrame: document.getElementById('previewFrame'),
+            previewContainer: document.getElementById('previewContainer'),
+            viewerLoading: document.getElementById('viewerLoading'),
+            viewerError: document.getElementById('viewerError'),
+            btnCopyViewerLink: document.getElementById('btnCopyViewerLink'),
+            btnReloadFrame: document.getElementById('btnReloadFrame'),
+            btnToggleHeader: document.getElementById('btnToggleHeader'),
+            btnRestoreHeader: document.getElementById('btnRestoreHeader'),
+            btnDesktop: document.getElementById('btnDeviceDesktop'),
+            btnTablet: document.getElementById('btnDeviceTablet'),
+            btnMobile: document.getElementById('btnDeviceMobile'),
+        };
+
+        let currentProjectData = null;
+
+        // Device Switcher
+        function setDevice(device) {
+            elements.previewContainer.className = 'preview-container flex items-center justify-center';
+            elements.btnDesktop.className = 'px-2.5 py-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition';
+            elements.btnTablet.className = 'px-2.5 py-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition';
+            elements.btnMobile.className = 'px-2.5 py-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition';
+
+            if (device === 'tablet') {
+                elements.previewContainer.classList.add('preview-tablet');
+                elements.btnTablet.className = 'px-2.5 py-1 rounded-lg bg-gray-800 text-white transition';
+            } else if (device === 'mobile') {
+                elements.previewContainer.classList.add('preview-mobile');
+                elements.btnMobile.className = 'px-2.5 py-1 rounded-lg bg-gray-800 text-white transition';
+            } else {
+                elements.previewContainer.classList.add('preview-desktop');
+                elements.btnDesktop.className = 'px-2.5 py-1 rounded-lg bg-gray-800 text-white transition';
+            }
+        }
+
+        elements.btnDesktop.addEventListener('click', () => setDevice('desktop'));
+        elements.btnTablet.addEventListener('click', () => setDevice('tablet'));
+        elements.btnMobile.addEventListener('click', () => setDevice('mobile'));
+
+        // Toggle Fullscreen / Header
+        elements.btnToggleHeader.addEventListener('click', () => {
+            elements.viewerHeader.classList.add('-translate-y-full');
+            elements.btnRestoreHeader.classList.remove('hidden');
+        });
+
+        elements.btnRestoreHeader.addEventListener('click', () => {
+            elements.viewerHeader.classList.remove('-translate-y-full');
+            elements.btnRestoreHeader.classList.add('hidden');
+        });
+
+        // Copy Link
+        elements.btnCopyViewerLink.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                elements.btnCopyViewerLink.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Copiado';
+                setTimeout(() => {
+                    elements.btnCopyViewerLink.innerHTML = '<i class="fa-regular fa-copy text-emerald-400"></i> Copiar Link';
+                }, 2000);
+            } catch (e) {
+                prompt('Copia este enlace:', window.location.href);
+            }
+        });
+
+        // Render project into iframe
+        function renderProject(project) {
+            currentProjectData = project;
+            document.title = `${project.name} | Brazuk4 Web Viewer`;
+            elements.siteTitleBadge.textContent = project.name;
+            elements.sitePathBadge.textContent = project.randomPath || `/p/${project.id}`;
+
+            // Create Virtual In-Memory File System using Blob URLs
+            const fileMap = {}; // normalized path -> blob URL
+            const mimeTypes = {
+                'css': 'text/css',
+                'js': 'application/javascript',
+                'json': 'application/json',
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'svg': 'image/svg+xml',
+                'gif': 'image/gif',
+                'webp': 'image/webp',
+                'ico': 'image/x-icon',
+                'html': 'text/html'
+            };
+
+            // First pass: generate Blob URLs for all assets
+            project.files.forEach(file => {
+                const normPath = file.path.replace(/^\/+/, '');
+                const ext = normPath.split('.').pop().toLowerCase();
+                const mime = mimeTypes[ext] || file.type || 'text/plain';
+
+                let blob;
+                if (file.isBase64) {
+                    const byteChars = atob(file.content);
+                    const byteNumbers = new Array(byteChars.length);
+                    for (let i = 0; i < byteChars.length; i++) {
+                        byteNumbers[i] = byteChars.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    blob = new Blob([byteArray], { type: mime });
+                } else {
+                    blob = new Blob([file.content], { type: mime });
+                }
+                const blobUrl = URL.createObjectURL(blob);
+                fileMap[normPath] = blobUrl;
+                fileMap['./' + normPath] = blobUrl;
+                fileMap['/' + normPath] = blobUrl;
+            });
+
+            // Find entry file (index.html or first .html file)
+            let entryFile = project.files.find(f => {
+                const p = f.path.replace(/^\/+/, '').toLowerCase();
+                return p === 'index.html' || p.endsWith('/index.html');
+            }) || project.files.find(f => f.path.endsWith('.html'));
+
+            if (!entryFile) {
+                // Generate a fallback default index.html if not present
+                entryFile = {
+                    path: 'index.html',
+                    content: `<!DOCTYPE html><html><head><title>${project.name}</title><style>body{font-family:sans-serif;padding:2rem;text-align:center;background:#0f172a;color:#f8fafc;}</style></head><body><h1>${project.name}</h1><p>Proyecto desplegado con éxito en Brazuk4 Web Loader.</p></body></html>`
+                };
+            }
+
+            // Transform entry HTML to inject or replace relative URLs with Virtual Blob URLs
+            let htmlContent = entryFile.content;
+
+            // Replace referenced stylesheets, scripts, images, audio, video
+            Object.keys(fileMap).forEach(filePath => {
+                const blobUrl = fileMap[filePath];
+                // Regex for src and href attributes matching this path
+                const escaped = filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const srcRegex = new RegExp(`(src=["'])${escaped}(["'])`, 'gi');
+                const hrefRegex = new RegExp(`(href=["'])${escaped}(["'])`, 'gi');
+                htmlContent = htmlContent.replace(srcRegex, `$1${blobUrl}$2`);
+                htmlContent = htmlContent.replace(hrefRegex, `$1${blobUrl}$2`);
+            });
+
+            // Load into iframe
+            const htmlBlob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const htmlBlobUrl = URL.createObjectURL(htmlBlob);
+            elements.previewFrame.src = htmlBlobUrl;
+
+            // Hide loading
+            elements.previewFrame.onload = () => {
+                elements.viewerLoading.classList.add('hidden');
+            };
+
+            elements.btnReloadFrame.onclick = () => {
+                elements.previewFrame.src = htmlBlobUrl;
+            };
+        }
+
+        // Initialize Viewer
+        async function initViewer() {
+            try {
+                let project = null;
+
+                if (siteId) {
+                    project = await getProjectById(siteId);
+                }
+
+                // If not found by ID, try searching by custom slug or random path
+                if (!project && siteSlug) {
+                    const all = await getAllProjects();
+                    project = all.find(p => p.slug === siteSlug || (p.randomPath && p.randomPath.includes(siteSlug)));
+                }
+
+                // If still not found and there are projects in DB, fallback to the latest one
+                if (!project) {
+                    const all = await getAllProjects();
+                    if (all.length > 0) {
+                        project = all[all.length - 1]; // Latest uploaded project
+                    }
+                }
+
+                if (project) {
+                    renderProject(project);
+                } else {
+                    elements.viewerLoading.classList.add('hidden');
+                    elements.viewerError.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Error loading project in viewer:", err);
+                elements.viewerLoading.classList.add('hidden');
+                elements.viewerError.classList.remove('hidden');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', initViewer);
+    </script>
+</body>
+</html>
