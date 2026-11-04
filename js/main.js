@@ -630,7 +630,76 @@ async function processDataTransferItems(items) {
         }
     }
 
-    return fileEntries;
+    return normalizeProjectFiles(fileEntries);
+}
+
+// Clean file paths, slashes, and strip common root folder so index.html is at root
+function normalizeProjectFiles(files) {
+    if (!files || files.length === 0) return [];
+
+    files.forEach(f => {
+        f.path = f.path.replace(/\\/g, '/').replace(/^\/+/, '');
+    });
+
+    const indexEntry = files.find(f => {
+        const p = f.path.toLowerCase();
+        return p === 'index.html' || p.endsWith('/index.html') || p === 'index.htm' || p.endsWith('/index.htm');
+    });
+
+    let prefixToRemove = '';
+    if (indexEntry) {
+        const parts = indexEntry.path.split('/');
+        if (parts.length > 1) {
+            parts.pop();
+            prefixToRemove = parts.join('/') + '/';
+        }
+    } else {
+        const firstParts = files[0].path.split('/');
+        if (firstParts.length > 1) {
+            const testPrefix = firstParts[0] + '/';
+            if (files.every(f => f.path.startsWith(testPrefix))) {
+                prefixToRemove = testPrefix;
+            }
+        }
+    }
+
+    if (prefixToRemove) {
+        files.forEach(f => {
+            if (f.path.startsWith(prefixToRemove)) {
+                f.path = f.path.substring(prefixToRemove.length);
+            }
+        });
+    }
+
+    const mimeMap = {
+        'html': 'text/html;charset=utf-8',
+        'htm': 'text/html;charset=utf-8',
+        'css': 'text/css;charset=utf-8',
+        'js': 'application/javascript;charset=utf-8',
+        'json': 'application/json',
+        'svg': 'image/svg+xml',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'ico': 'image/x-icon',
+        'woff': 'font/woff',
+        'woff2': 'font/woff2',
+        'ttf': 'font/ttf',
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'mp4': 'video/mp4'
+    };
+
+    files.forEach(f => {
+        const ext = f.path.split('.').pop().toLowerCase();
+        if (!f.type || f.type === 'application/octet-stream') {
+            f.type = mimeMap[ext] || f.type || 'text/plain';
+        }
+    });
+
+    return files;
 }
 
 async function processFileList(fileList) {
@@ -653,7 +722,7 @@ async function processFileList(fileList) {
             });
         }
     }
-    return results;
+    return normalizeProjectFiles(results);
 }
 
 function renderSelectedFilesPreview() {
@@ -796,9 +865,12 @@ el.btnConfirmUpload.addEventListener('click', async () => {
     }
 
     // Generate project metadata
+    state.selectedFiles = normalizeProjectFiles(state.selectedFiles);
     const projectId = 'proj_' + Date.now().toString(36) + '_' + generateRandomSlug(6);
     const slug = sanitizeSlug(state.currentSiteName);
-    const randomPath = `/p/${slug}${generateRandomHierarchicalPath()}`;
+    const hierarchicalPath = generateRandomHierarchicalPath();
+    const independentUrl = `https://${slug}.com${hierarchicalPath}`;
+    const randomPath = `/${slug}${hierarchicalPath}`;
     
     let totalBytes = 0;
     state.selectedFiles.forEach(f => totalBytes += f.size || 0);
@@ -812,6 +884,7 @@ el.btnConfirmUpload.addEventListener('click', async () => {
         name: state.currentSiteName,
         slug: slug,
         randomPath: randomPath,
+        displayUrl: independentUrl,
         publicUrl: publicUrl,
         author: state.currentUser ? { name: state.currentUser.name, email: state.currentUser.email } : { name: 'Anónimo' },
         files: state.selectedFiles,
@@ -825,7 +898,7 @@ el.btnConfirmUpload.addEventListener('click', async () => {
     try {
         await saveProjectToDB(newProject);
         
-        el.successUrlInput.value = publicUrl;
+        el.successUrlInput.value = independentUrl;
         el.btnOpenSuccessSite.href = publicUrl;
         showStep(4);
         showToast('¡Proyecto publicado exitosamente!', 'success');
@@ -926,12 +999,12 @@ function renderProjectsList(filterText = '') {
                     </span>
                 </div>
 
-                <!-- Custom Random Path Badge -->
+                <!-- Custom Random Independent Path Badge -->
                 <div class="mb-4 bg-[#090D16] border border-gray-800/80 rounded-xl p-2.5 flex items-center justify-between text-xs font-mono text-gray-400">
-                    <span class="truncate text-emerald-400/90 text-[11px]" title="${project.randomPath}">
-                        ${project.randomPath || ('/p/' + project.slug)}
+                    <span class="truncate text-emerald-400/90 text-[11px]" title="${project.displayUrl || ('https://' + project.slug + '.web' + project.randomPath)}">
+                        ${project.displayUrl || ('https://' + project.slug + '.web' + project.randomPath)}
                     </span>
-                    <button class="btn-copy-card-path ml-1.5 text-gray-500 hover:text-emerald-400 transition" title="Copiar enlace" data-url="${project.publicUrl}">
+                    <button class="btn-copy-card-path ml-1.5 text-gray-500 hover:text-emerald-400 transition" title="Copiar enlace" data-url="${project.displayUrl || project.publicUrl}">
                         <i class="fa-regular fa-copy"></i>
                     </button>
                 </div>
@@ -1167,6 +1240,7 @@ el.btnConfirmUpdateModal.addEventListener('click', async () => {
         await new Promise(r => setTimeout(r, 180));
     }
 
+    state.updateSelectedFiles = normalizeProjectFiles(state.updateSelectedFiles);
     let totalBytes = 0;
     state.updateSelectedFiles.forEach(f => totalBytes += f.size || 0);
 

@@ -36,7 +36,7 @@
         <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3 animate-spin">
             <i class="fa-solid fa-spinner text-lg"></i>
         </div>
-        <p class="text-xs font-mono text-gray-400">Cargando sitio web independiente...</p>
+        <p class="text-xs font-mono text-gray-400">Cargando sitio web con todos sus estilos...</p>
     </div>
 
     <!-- Error State (if project not found) -->
@@ -46,7 +46,7 @@
         </div>
         <h2 class="text-lg font-bold text-white mb-2">Página Web no encontrada</h2>
         <p class="text-gray-400 text-xs max-w-sm mb-6">
-            Esta ruta no contiene archivos publicados o el proyecto no existe en este servidor.
+            Esta ruta no contiene archivos publicados o el proyecto no existe en este navegador.
         </p>
         <a href="index.html" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition">
             Ir al inicio
@@ -106,7 +106,6 @@
         let siteId = urlParams.get('id');
         let siteSlug = urlParams.get('p') || urlParams.get('slug');
 
-        // Also check pathname (for /p/slug/part1/part2)
         const pathParts = window.location.pathname.split('/').filter(Boolean);
         if (!siteSlug && pathParts.length > 1 && pathParts[0] === 'p') {
             siteSlug = pathParts[1];
@@ -116,13 +115,64 @@
         const viewerLoading = document.getElementById('viewerLoading');
         const viewerError = document.getElementById('viewerError');
 
+        // Normalize slashes and strip common parent folder so index.html is always at root
+        function normalizeProjectFiles(files) {
+            if (!files || files.length === 0) return [];
+
+            files.forEach(f => {
+                f.path = f.path.replace(/\\/g, '/').replace(/^\/+/, '');
+            });
+
+            // Look for index.html or index.htm
+            const indexEntry = files.find(f => {
+                const p = f.path.toLowerCase();
+                return p === 'index.html' || p.endsWith('/index.html') || p === 'index.htm' || p.endsWith('/index.htm');
+            });
+
+            let prefixToRemove = '';
+            if (indexEntry) {
+                const parts = indexEntry.path.split('/');
+                if (parts.length > 1) {
+                    parts.pop(); // remove filename
+                    prefixToRemove = parts.join('/') + '/';
+                }
+            } else {
+                const firstParts = files[0].path.split('/');
+                if (firstParts.length > 1) {
+                    const testPrefix = firstParts[0] + '/';
+                    if (files.every(f => f.path.startsWith(testPrefix))) {
+                        prefixToRemove = testPrefix;
+                    }
+                }
+            }
+
+            if (prefixToRemove) {
+                files.forEach(f => {
+                    if (f.path.startsWith(prefixToRemove)) {
+                        f.path = f.path.substring(prefixToRemove.length);
+                    }
+                });
+            }
+
+            return files;
+        }
+
         function renderProject(project) {
             document.title = project.name || 'Mi Página Web';
 
-            const fileMap = {};
+            // Clean address bar: change URL to custom independent path
+            if (window.history && window.history.replaceState && project.randomPath) {
+                try {
+                    window.history.replaceState(null, project.name, project.randomPath);
+                } catch (e) {}
+            }
+
+            // Normalize files
+            const files = normalizeProjectFiles(project.files || []);
+
             const mimeTypes = {
-                'css': 'text/css',
-                'js': 'application/javascript',
+                'css': 'text/css;charset=utf-8',
+                'js': 'application/javascript;charset=utf-8',
                 'json': 'application/json',
                 'png': 'image/png',
                 'jpg': 'image/jpeg',
@@ -131,38 +181,120 @@
                 'gif': 'image/gif',
                 'webp': 'image/webp',
                 'ico': 'image/x-icon',
-                'html': 'text/html'
+                'html': 'text/html;charset=utf-8',
+                'htm': 'text/html;charset=utf-8',
+                'woff': 'font/woff',
+                'woff2': 'font/woff2',
+                'ttf': 'font/ttf',
+                'mp3': 'audio/mpeg',
+                'wav': 'audio/wav',
+                'mp4': 'video/mp4'
             };
 
-            // First pass: generate Blob URLs for all assets
-            project.files.forEach(file => {
-                const normPath = file.path.replace(/^\/+/, '');
-                const ext = normPath.split('.').pop().toLowerCase();
+            // Structure holding all assets and blob URLs
+            const fileRegistry = []; // array of { path, basename, file, blobUrl, mime }
+            const pathLookup = {}; // key -> { file, blobUrl, mime }
+
+            files.forEach(file => {
+                const cleanPath = file.path.replace(/^\/+/, '');
+                const ext = cleanPath.split('.').pop().toLowerCase();
                 const mime = mimeTypes[ext] || file.type || 'text/plain';
 
                 let blob;
                 if (file.isBase64) {
-                    const byteChars = atob(file.content);
-                    const byteNumbers = new Array(byteChars.length);
-                    for (let i = 0; i < byteChars.length; i++) {
-                        byteNumbers[i] = byteChars.charCodeAt(i);
+                    try {
+                        const byteChars = atob(file.content);
+                        const byteNumbers = new Array(byteChars.length);
+                        for (let i = 0; i < byteChars.length; i++) {
+                            byteNumbers[i] = byteChars.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        blob = new Blob([byteArray], { type: mime });
+                    } catch (err) {
+                        blob = new Blob([file.content], { type: mime });
                     }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    blob = new Blob([byteArray], { type: mime });
                 } else {
                     blob = new Blob([file.content], { type: mime });
                 }
+
                 const blobUrl = URL.createObjectURL(blob);
-                fileMap[normPath] = blobUrl;
-                fileMap['./' + normPath] = blobUrl;
-                fileMap['/' + normPath] = blobUrl;
+                const basename = cleanPath.split('/').pop();
+
+                const entry = {
+                    path: cleanPath,
+                    basename: basename,
+                    file: file,
+                    blobUrl: blobUrl,
+                    mime: mime
+                };
+
+                fileRegistry.push(entry);
+
+                // Add to multi-key lookup
+                const keys = [
+                    cleanPath,
+                    cleanPath.toLowerCase(),
+                    './' + cleanPath,
+                    '/' + cleanPath,
+                    basename,
+                    basename.toLowerCase()
+                ];
+
+                keys.forEach(k => {
+                    pathLookup[k] = entry;
+                });
             });
 
-            // Find entry file
-            let entryFile = project.files.find(f => {
-                const p = f.path.replace(/^\/+/, '').toLowerCase();
+            // Helper to resolve any referenced path
+            function resolveAsset(refUrl) {
+                if (!refUrl) return null;
+                const clean = refUrl.trim()
+                    .replace(/^['"]|['"]$/g, '')
+                    .split(/[?#]/)[0]
+                    .replace(/\\/g, '/');
+
+                if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('//') || clean.startsWith('data:') || clean.startsWith('blob:')) {
+                    return null; // External or absolute
+                }
+
+                const stripped = clean.replace(/^\.\//, '').replace(/^\/+/, '');
+                const base = stripped.split('/').pop();
+
+                return pathLookup[clean] || 
+                       pathLookup[stripped] || 
+                       pathLookup[stripped.toLowerCase()] || 
+                       pathLookup[base] || 
+                       pathLookup[base.toLowerCase()] || 
+                       null;
+            }
+
+            // Function to rewrite url(...) inside CSS stylesheets
+            function rewriteCssUrls(cssText) {
+                if (!cssText) return '';
+                return cssText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (match, quote, assetPath) => {
+                    const resolved = resolveAsset(assetPath);
+                    if (resolved) {
+                        return `url("${resolved.blobUrl}")`;
+                    }
+                    return match;
+                });
+            }
+
+            // Pre-process all CSS files with rewritten image/font URLs
+            fileRegistry.forEach(entry => {
+                if (entry.path.endsWith('.css') && typeof entry.file.content === 'string') {
+                    entry.processedCss = rewriteCssUrls(entry.file.content);
+                    // Update blob URL with processed CSS
+                    const newBlob = new Blob([entry.processedCss], { type: 'text/css;charset=utf-8' });
+                    entry.blobUrl = URL.createObjectURL(newBlob);
+                }
+            });
+
+            // Find entry file (index.html or first html file)
+            let entryFile = files.find(f => {
+                const p = f.path.toLowerCase();
                 return p === 'index.html' || p.endsWith('/index.html');
-            }) || project.files.find(f => f.path.endsWith('.html'));
+            }) || files.find(f => f.path.toLowerCase().endsWith('.html') || f.path.toLowerCase().endsWith('.htm'));
 
             if (!entryFile) {
                 entryFile = {
@@ -171,19 +303,110 @@
                 };
             }
 
-            let htmlContent = entryFile.content;
+            // Parse HTML with DOMParser for 100% accurate asset linking
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(entryFile.content, 'text/html');
 
-            // Replace relative URLs with Blob URLs
-            Object.keys(fileMap).forEach(filePath => {
-                const blobUrl = fileMap[filePath];
-                const escaped = filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const srcRegex = new RegExp(`(src=["'])${escaped}(["'])`, 'gi');
-                const hrefRegex = new RegExp(`(href=["'])${escaped}(["'])`, 'gi');
-                htmlContent = htmlContent.replace(srcRegex, `$1${blobUrl}$2`);
-                htmlContent = htmlContent.replace(hrefRegex, `$1${blobUrl}$2`);
+            // 1. Process <link rel="stylesheet"> -> Inline CSS or replace href
+            doc.querySelectorAll('link').forEach(link => {
+                const rel = (link.getAttribute('rel') || '').toLowerCase();
+                const href = link.getAttribute('href');
+                if (!href) return;
+
+                if (rel.includes('stylesheet') || rel.includes('preload') || href.endsWith('.css')) {
+                    const resolved = resolveAsset(href);
+                    if (resolved) {
+                        // INLINE the CSS directly so the browser ALWAYS renders all styles instantly
+                        const styleTag = doc.createElement('style');
+                        styleTag.setAttribute('data-inlined-from', href);
+                        styleTag.textContent = resolved.processedCss || resolved.file.content || '';
+                        link.replaceWith(styleTag);
+                    }
+                } else if (rel.includes('icon')) {
+                    const resolved = resolveAsset(href);
+                    if (resolved) {
+                        link.setAttribute('href', resolved.blobUrl);
+                    }
+                }
             });
 
-            const htmlBlob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            // 2. Process all <style> tags in the HTML (rewrite url() for background images, fonts)
+            doc.querySelectorAll('style').forEach(style => {
+                if (style.textContent) {
+                    style.textContent = rewriteCssUrls(style.textContent);
+                }
+            });
+
+            // 3. Process inline style="..." attributes
+            doc.querySelectorAll('[style]').forEach(el => {
+                const s = el.getAttribute('style');
+                if (s && s.includes('url(')) {
+                    el.setAttribute('style', rewriteCssUrls(s));
+                }
+            });
+
+            // 4. Process <script src="...">
+            doc.querySelectorAll('script').forEach(script => {
+                const src = script.getAttribute('src');
+                if (src) {
+                    const resolved = resolveAsset(src);
+                    if (resolved) {
+                        script.setAttribute('src', resolved.blobUrl);
+                    }
+                }
+            });
+
+            // 5. Process all media and asset elements (img, source, audio, video, etc.)
+            const mediaSelectors = 'img[src], img[data-src], image[href], image[xlink\\:href], source[src], video[src], audio[src], input[type="image"][src]';
+            doc.querySelectorAll(mediaSelectors).forEach(media => {
+                const srcAttr = media.hasAttribute('src') ? 'src' : (media.hasAttribute('href') ? 'href' : 'xlink:href');
+                const rawSrc = media.getAttribute(srcAttr);
+                if (rawSrc) {
+                    const resolved = resolveAsset(rawSrc);
+                    if (resolved) {
+                        media.setAttribute(srcAttr, resolved.blobUrl);
+                    }
+                }
+            });
+
+            // 6. Build virtual map for dynamic JS fetches (e.g. new Image().src = "hero.png" or fetch("data.json"))
+            const virtualFileMap = {};
+            fileRegistry.forEach(item => {
+                virtualFileMap[item.path] = item.blobUrl;
+                virtualFileMap[item.basename] = item.blobUrl;
+                virtualFileMap['./' + item.path] = item.blobUrl;
+                virtualFileMap['./' + item.basename] = item.blobUrl;
+            });
+
+            // Inject runtime fetch & asset interceptor into <head>
+            const runtimeScript = doc.createElement('script');
+            runtimeScript.textContent = `
+                (function() {
+                    const __VIRTUAL_MAP__ = ${JSON.stringify(virtualFileMap)};
+                    const origFetch = window.fetch;
+                    if (origFetch) {
+                        window.fetch = function(input, init) {
+                            if (typeof input === 'string') {
+                                const clean = input.replace(/^\\.\\//, '').replace(/^\\/+/, '').split(/[?#]/)[0];
+                                const base = clean.split('/').pop();
+                                const target = __VIRTUAL_MAP__[clean] || __VIRTUAL_MAP__[base];
+                                if (target) return origFetch(target, init);
+                            }
+                            return origFetch(input, init);
+                        };
+                    }
+                })();
+            `;
+
+            if (doc.head) {
+                doc.head.insertBefore(runtimeScript, doc.head.firstChild);
+            } else {
+                doc.body.insertBefore(runtimeScript, doc.body.firstChild);
+            }
+
+            // Generate compiled HTML blob and assign to iframe
+            const finalHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+            const htmlBlob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
             const htmlBlobUrl = URL.createObjectURL(htmlBlob);
             previewFrame.src = htmlBlobUrl;
 
